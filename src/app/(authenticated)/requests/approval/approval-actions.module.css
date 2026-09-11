@@ -35,3 +35,9 @@
   display: flex;
   gap: 0.5rem;
 }
+
+.error {
+  margin-bottom: 0.75rem;
+  font-size: 0.875rem;
+  color: var(--danger);
+}

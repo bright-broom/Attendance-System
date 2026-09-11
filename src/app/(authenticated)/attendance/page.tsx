@@ -1,25 +1,12 @@
 import { createClient } from '@/lib/supabase/server'
+import { requireEmployee } from '@/lib/auth'
 import { addDaysToDateString, getTodayString } from '@/lib/utils'
 import { AttendanceClient } from './attendance-client'
 
 export default async function AttendancePage() {
+  const employee = await requireEmployee()
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
 
-  if (!user) return null
-
-  // まず社員情報を取得
-  const { data: employee } = await supabase
-    .from('employees')
-    .select('id, name')
-    .eq('user_id', user.id)
-    .single()
-
-  if (!employee) {
-    return <AttendanceClient initialEmployee={null} initialRecords={[]} />
-  }
-
-  // 社員IDがわかったら今日の打刻記録を取得
   // 今日（日本時間 0:00〜翌 0:00）の打刻記録を取得
   const today = getTodayString()
   const tomorrow = addDaysToDateString(today, 1)
@@ -33,7 +20,7 @@ export default async function AttendancePage() {
 
   return (
     <AttendanceClient
-      initialEmployee={employee}
+      initialEmployee={{ id: employee.id, name: employee.name }}
       initialRecords={records || []}
     />
   )

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { use, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
@@ -14,11 +14,19 @@ const LOGIN_RATE_LIMIT = {
   windowMs: 5 * 60 * 1000, // 5分間に5回まで
 }
 
-export default function LoginPage() {
+interface LoginPageProps {
+  searchParams: Promise<{ error?: string }>
+}
+
+export default function LoginPage({ searchParams }: LoginPageProps) {
   const router = useRouter()
+  const { error: errorParam } = use(searchParams)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [error, setError] = useState('')
+  // 無効化された社員などでセッションが破棄された場合
+  const [error, setError] = useState(
+    errorParam === 'inactive' ? 'このアカウントは利用できません。管理者にお問い合わせください' : ''
+  )
   const [isLoading, setIsLoading] = useState(false)
   const [isLocked, setIsLocked] = useState(false)
 
@@ -62,12 +70,7 @@ export default function LoginPage() {
       })
 
       if (authError) {
-        const remaining = rateLimit.remainingAttempts
-        if (remaining <= 2) {
-          setError(`認証に失敗しました（残り${remaining}回）`)
-        } else {
-          setError('メールアドレスまたはパスワードが正しくありません')
-        }
+        setError('メールアドレスまたはパスワードが正しくありません')
         setIsLoading(false)
         return
       }

@@ -1,13 +1,13 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { VALIDATION_RULES, sanitize } from '@/lib/security'
+import { VALIDATION_RULES } from '@/lib/security'
 import type { RequestType, LeaveType } from '@/types/database'
+import { createRequest } from '../actions'
 import styles from './page.module.css'
 
 const MAX_REASON_LENGTH = VALIDATION_RULES.reason.maxLength
@@ -16,7 +16,6 @@ export default function NewRequestPage() {
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
-  const [employeeId, setEmployeeId] = useState<string>('')
 
   const [formData, setFormData] = useState({
     request_type: 'leave' as RequestType,
@@ -27,22 +26,6 @@ export default function NewRequestPage() {
   })
 
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({})
-
-  useEffect(() => {
-    const fetchEmployee = async () => {
-      const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
-      if (user) {
-        const { data: emp } = await supabase
-          .from('employees')
-          .select('id')
-          .eq('user_id', user.id)
-          .single()
-        if (emp) setEmployeeId(emp.id)
-      }
-    }
-    fetchEmployee()
-  }, [])
 
   const validateForm = useCallback((): boolean => {
     const errors: Record<string, string> = {}
@@ -72,8 +55,6 @@ export default function NewRequestPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!employeeId) return
-
     if (!validateForm()) {
       return
     }
@@ -82,19 +63,11 @@ export default function NewRequestPage() {
     setError('')
 
     try {
-      const supabase = createClient()
+      // 申請者はサーバー側でログイン中の社員に決まる。入力もサーバー側で再検証する
+      const { error: createError } = await createRequest(formData)
 
-      const { error: insertError } = await supabase.from('requests').insert({
-        employee_id: employeeId,
-        request_type: formData.request_type,
-        start_date: formData.start_date,
-        end_date: formData.end_date || formData.start_date,
-        reason: sanitize(formData.reason),
-        leave_type: formData.request_type === 'leave' ? formData.leave_type : null,
-      })
-
-      if (insertError) {
-        setError('申請の登録に失敗しました')
+      if (createError) {
+        setError(createError)
         setIsLoading(false)
         return
       }

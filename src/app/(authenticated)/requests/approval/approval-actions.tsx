@@ -2,51 +2,42 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
+import { decideRequest } from '../actions'
 import styles from './approval-actions.module.css'
 
 interface ApprovalActionsProps {
   requestId: string
-  approverId: string
 }
 
-export function ApprovalActions({ requestId, approverId }: ApprovalActionsProps) {
+export function ApprovalActions({ requestId }: ApprovalActionsProps) {
   const router = useRouter()
   const [isLoading, setIsLoading] = useState<string | null>(null)
   const [comment, setComment] = useState('')
   const [showComment, setShowComment] = useState(false)
+  const [error, setError] = useState('')
 
   const handleAction = async (action: 'approved' | 'rejected' | 'returned') => {
     setIsLoading(action)
-    const supabase = createClient()
+    setError('')
 
-    // 承認レコードを作成
-    const { error: approvalError } = await supabase.from('approvals').insert({
-      request_id: requestId,
-      approver_id: approverId,
-      action,
-      comment: comment || null,
-    })
-
-    if (approvalError) {
+    try {
+      const { error: actionError } = await decideRequest(requestId, action, comment)
+      if (actionError) {
+        setError(actionError)
+        return
+      }
+      router.refresh()
+    } catch {
+      setError('処理中にエラーが発生しました')
+    } finally {
       setIsLoading(null)
-      return
     }
-
-    // 申請ステータスを更新
-    const newStatus = action === 'returned' ? 'pending' : action
-    await supabase
-      .from('requests')
-      .update({ status: newStatus })
-      .eq('id', requestId)
-
-    router.refresh()
-    setIsLoading(null)
   }
 
   return (
     <div className={styles.container}>
+      {error && <p className={styles.error}>{error}</p>}
       {showComment && (
         <div className={styles.commentField}>
           <textarea

@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { requireEmployee } from '@/lib/auth'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import {
   formatDate,
@@ -12,29 +13,8 @@ import Link from 'next/link'
 import styles from './page.module.css'
 
 export default async function DashboardPage() {
+  const employee = await requireEmployee()
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-
-  if (!user) return null
-
-  // 社員情報を取得
-  const { data: employee } = await supabase
-    .from('employees')
-    .select('*')
-    .eq('user_id', user.id)
-    .single()
-
-  if (!employee) {
-    return (
-      <div className={styles.container}>
-        <Card>
-          <CardContent>
-            <p>社員情報が登録されていません。管理者にお問い合わせください。</p>
-          </CardContent>
-        </Card>
-      </div>
-    )
-  }
 
   // 日付計算（日本時間）
   const today = new Date()

@@ -1,5 +1,6 @@
 'use server'
 
+import { getCurrentEmployee } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { validate } from '@/lib/security'
@@ -19,7 +20,11 @@ export interface CreateEmployeeInput {
 const ROLES = ['admin', 'manager', 'employee'] as const
 const EMPLOYMENT_TYPES = ['full_time', 'part_time', 'contract'] as const
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/
-const MIN_PASSWORD_LENGTH = 8
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const STRING_FIELDS = [
+  'email', 'password', 'employee_number', 'name', 'department_id',
+  'role', 'employment_type', 'manager_id', 'hire_date',
+] as const
 
 function includes<T extends string>(list: readonly T[], value: string): value is T {
   return (list as readonly string[]).includes(value)
@@ -30,23 +35,17 @@ function includes<T extends string>(list: readonly T[], value: string): value is
  * 認証ユーザーの作成は service_role で行い、管理者自身のセッションには影響させない
  */
 export async function createEmployee(input: CreateEmployeeInput): Promise<{ error: string } | { error: null }> {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) {
-    return { error: 'ログインしてください' }
-  }
-
-  const { data: currentEmployee } = await supabase
-    .from('employees')
-    .select('role')
-    .eq('user_id', user.id)
-    .single()
-
+  // 有効な管理者のみ（無効化された管理者は getCurrentEmployee が null を返す）
+  const currentEmployee = await getCurrentEmployee()
   if (currentEmployee?.role !== 'admin') {
     return { error: '社員を登録する権限がありません' }
   }
 
-  // 入力検証
+  // 入力検証（クライアントからは任意の値が届く前提で型から確認する）
+  if (typeof input !== 'object' || input === null || STRING_FIELDS.some((key) => typeof input[key] !== 'string')) {
+    return { error: '入力内容に誤りがあります' }
+  }
+
   const email = input.email.trim().toLowerCase()
   const name = input.name.trim()
   const employeeNumber = input.employee_number.trim()
@@ -55,6 +54,7 @@ export async function createEmployee(input: CreateEmployeeInput): Promise<{ erro
     [email, 'email'],
     [employeeNumber, 'employeeNumber'],
     [name, 'name'],
+    [input.password, 'password'],
   ] as const) {
     const result = validate(value, rule)
     if (!result.isValid) {
@@ -62,14 +62,14 @@ export async function createEmployee(input: CreateEmployeeInput): Promise<{ erro
     }
   }
 
-  if (input.password.length < MIN_PASSWORD_LENGTH) {
-    return { error: `初期パスワードは${MIN_PASSWORD_LENGTH}文字以上で入力してください` }
-  }
   if (!includes(ROLES, input.role) || !includes(EMPLOYMENT_TYPES, input.employment_type)) {
     return { error: '権限または雇用区分が不正です' }
   }
   if (!DATE_PATTERN.test(input.hire_date)) {
     return { error: '入社日を入力してください' }
+  }
+  if ([input.department_id, input.manager_id].some((id) => id && !UUID_PATTERN.test(id))) {
+    return { error: '部門または上長の指定が不正です' }
   }
 
   // 認証ユーザーを作成
@@ -89,6 +89,7 @@ export async function createEmployee(input: CreateEmployeeInput): Promise<{ erro
   }
 
   // 社員情報を登録（管理者本人の権限で実行し、RLS も適用する）
+  const supabase = await createClient()
   const { error: empError } = await supabase.from('employees').insert({
     user_id: authData.user.id,
     employee_number: employeeNumber,
@@ -103,7 +104,10 @@ export async function createEmployee(input: CreateEmployeeInput): Promise<{ erro
 
   if (empError) {
     // 社員登録に失敗したら作成した認証ユーザーを削除して元に戻す
-    await admin.auth.admin.deleteUser(authData.user.id)
+    const { error: rollbackError } = await admin.auth.admin.deleteUser(authData.user.id)
+    if (rollbackError) {
+      console.error('[createEmployee] 認証ユーザーの削除に失敗しました', authData.user.id, rollbackError.message)
+    }
     return {
       error: empError.code === '23505'
         ? '社員番号またはメールアドレスが既に使われています'

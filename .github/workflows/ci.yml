@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  app:
+    name: Lint / Typecheck / Build
+    runs-on: ubuntu-latest
+    env:
+      # ビルド時に CSP の接続先として参照されるだけのダミー値
+      NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:54321
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-dummy-anon-key
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm audit --audit-level=high
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm run build
+
+  database:
+    name: Migrations / RLS tests / Type drift
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with:
+          # ローカルと同じバージョンに固定（型生成の出力差分を防ぐ）
+          version: 2.75.0
+      - name: Start database (applies all migrations)
+        run: supabase db start
+      - name: Authorization tests (pgTAP)
+        run: supabase test db
+      - name: Generated types are up to date
+        run: |
+          supabase gen types typescript --local --schema public > /tmp/supabase.ts
+          diff -u src/types/supabase.ts /tmp/supabase.ts
