@@ -1,6 +1,8 @@
 import type { NextConfig } from "next";
 
-// Supabase の接続先（ローカルの supabase start など *.supabase.co 以外にも対応）
+const isDev = process.env.NODE_ENV === 'development';
+
+// Supabase の接続先（使用しているプロジェクトのみ許可する）
 const supabaseOrigins = (() => {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   if (!url) return [];
@@ -9,10 +11,10 @@ const supabaseOrigins = (() => {
 })();
 
 const securityHeaders = [
-  // XSS攻撃対策
+  // 旧ブラウザの XSS フィルタは誤検知による情報漏えいの原因になるため無効化（CSP で対策する）
   {
     key: 'X-XSS-Protection',
-    value: '1; mode=block',
+    value: '0',
   },
   // クリックジャッキング対策
   {
@@ -32,7 +34,7 @@ const securityHeaders = [
   // 権限ポリシー
   {
     key: 'Permissions-Policy',
-    value: 'camera=(), microphone=(), geolocation=(self), interest-cohort=()',
+    value: 'camera=(), microphone=(), geolocation=(self)',
   },
   // HTTPS強制（本番環境用）
   {
@@ -44,24 +46,24 @@ const securityHeaders = [
     key: 'Content-Security-Policy',
     value: [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-eval' 'unsafe-inline'", // Next.js requires unsafe-eval/inline
+      // 'unsafe-eval' は開発時（React のデバッグ機能）のみ必要
+      `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ''}`,
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob:",
       "font-src 'self' data:",
-      ["connect-src 'self' https://*.supabase.co wss://*.supabase.co", ...supabaseOrigins].join(' '),
+      ["connect-src 'self'", ...supabaseOrigins].join(' '),
+      "object-src 'none'",
       "frame-ancestors 'none'",
       "form-action 'self'",
       "base-uri 'self'",
+      ...(isDev ? [] : ['upgrade-insecure-requests']),
     ].join('; '),
   },
 ];
 
 const nextConfig: NextConfig = {
-  experimental: {
-    serverActions: {
-      bodySizeLimit: '2mb',
-    },
-  },
+  // フレームワーク情報をレスポンスヘッダーに出さない
+  poweredByHeader: false,
   logging: {
     fetches: {
       fullUrl: false,

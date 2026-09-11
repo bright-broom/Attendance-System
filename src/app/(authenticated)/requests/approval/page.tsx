@@ -1,27 +1,15 @@
 import { createClient } from '@/lib/supabase/server'
-import { redirect } from 'next/navigation'
+import { requireRole } from '@/lib/auth'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { formatDate } from '@/lib/utils'
 import { ApprovalActions } from './approval-actions'
 import styles from './page.module.css'
 
 export default async function ApprovalPage() {
+  const currentEmployee = await requireRole('admin', 'manager')
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
 
-  if (!user) redirect('/login')
-
-  const { data: currentEmployee } = await supabase
-    .from('employees')
-    .select('*')
-    .eq('user_id', user.id)
-    .single()
-
-  if (!currentEmployee || !['admin', 'manager'].includes(currentEmployee.role)) {
-    redirect('/dashboard')
-  }
-
-  // 承認待ちの申請を取得（管理者は全件、マネージャーは部下の申請のみ）
+  // 承認待ちの申請を取得（管理者は全件、マネージャーは部下の申請のみ。自分の申請は除く）
   let query = supabase
     .from('requests')
     .select(`
@@ -34,6 +22,7 @@ export default async function ApprovalPage() {
       )
     `)
     .eq('status', 'pending')
+    .neq('employee_id', currentEmployee.id)
     .order('created_at', { ascending: false })
 
   if (currentEmployee.role === 'manager') {
@@ -120,10 +109,7 @@ export default async function ApprovalPage() {
                   </div>
                 </div>
 
-                <ApprovalActions
-                  requestId={req.id}
-                  approverId={currentEmployee.id}
-                />
+                <ApprovalActions requestId={req.id} />
               </CardContent>
             </Card>
           ))}

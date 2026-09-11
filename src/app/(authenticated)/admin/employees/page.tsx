@@ -1,35 +1,28 @@
 import { createClient } from '@/lib/supabase/server'
-import { redirect } from 'next/navigation'
+import { requireRole } from '@/lib/auth'
 import Link from 'next/link'
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { formatDate } from '@/lib/utils'
 import styles from './page.module.css'
 
 export default async function EmployeesPage() {
+  await requireRole('admin')
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-
-  if (!user) redirect('/login')
-
-  // 管理者チェック
-  const { data: currentEmployee } = await supabase
-    .from('employees')
-    .select('role')
-    .eq('user_id', user.id)
-    .single()
-
-  if (currentEmployee?.role !== 'admin') {
-    redirect('/dashboard')
-  }
 
   // 社員一覧を取得
   const { data: employees } = await supabase
     .from('employees')
     .select(`
-      *,
-      departments(name),
-      manager:employees!employees_manager_id_fkey(name)
+      id,
+      employee_number,
+      name,
+      email,
+      role,
+      employment_type,
+      hire_date,
+      is_active,
+      departments(name)
     `)
     .order('employee_number', { ascending: true })
 

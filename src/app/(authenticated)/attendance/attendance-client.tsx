@@ -1,11 +1,12 @@
 'use client'
 
-import { useState, useCallback, useTransition, memo, useMemo } from 'react'
+import { useState, useCallback, memo, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { ClockDisplay } from '@/components/clock-display'
 import { formatTime } from '@/lib/utils'
+import type { AttendanceType } from '@/types/database'
 import styles from './page.module.css'
 
 interface Employee {
@@ -97,7 +98,6 @@ export function AttendanceClient({
   initialRecords,
 }: AttendanceClientProps) {
   const [records, setRecords] = useState<AttendanceRecord[]>(initialRecords)
-  const [isPending, startTransition] = useTransition()
   const [loadingType, setLoadingType] = useState<string | null>(null)
 
   // レコードからステータスを計算（メモ化）
@@ -122,7 +122,7 @@ export function AttendanceClient({
   }), [initialEmployee, clockIn, clockOut, isOnBreak])
 
   // 楽観的UI更新付き打刻処理
-  const handlePunch = useCallback(async (type: string) => {
+  const handlePunch = useCallback(async (type: AttendanceType) => {
     if (!initialEmployee) return
 
     setLoadingType(type)
@@ -197,7 +197,7 @@ export function AttendanceClient({
               <Button
                 size="lg"
                 onClick={() => handlePunch('clock_in')}
-                disabled={!buttonStates.canClockIn || isPending}
+                disabled={!buttonStates.canClockIn}
                 isLoading={loadingType === 'clock_in'}
                 className={styles.punchButton}
               >
@@ -207,7 +207,7 @@ export function AttendanceClient({
                 size="lg"
                 variant="danger"
                 onClick={() => handlePunch('clock_out')}
-                disabled={!buttonStates.canClockOut || isPending}
+                disabled={!buttonStates.canClockOut}
                 isLoading={loadingType === 'clock_out'}
                 className={styles.punchButton}
               >
@@ -219,7 +219,7 @@ export function AttendanceClient({
               <Button
                 variant="secondary"
                 onClick={() => handlePunch('break_start')}
-                disabled={!buttonStates.canBreakStart || isPending}
+                disabled={!buttonStates.canBreakStart}
                 isLoading={loadingType === 'break_start'}
               >
                 休憩開始
@@ -227,7 +227,7 @@ export function AttendanceClient({
               <Button
                 variant="secondary"
                 onClick={() => handlePunch('break_end')}
-                disabled={!buttonStates.canBreakEnd || isPending}
+                disabled={!buttonStates.canBreakEnd}
                 isLoading={loadingType === 'break_end'}
               >
                 休憩終了

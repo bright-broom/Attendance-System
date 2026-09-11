@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -15,25 +14,30 @@ interface Department {
 }
 
 export default function DepartmentsPage() {
-  const router = useRouter()
   const [departments, setDepartments] = useState<Department[]>([])
   const [newDeptName, setNewDeptName] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editingName, setEditingName] = useState('')
 
-  useEffect(() => {
-    fetchDepartments()
-  }, [])
+  const loadDepartments = () =>
+    createClient().from('departments').select('id, name, parent_id').order('name')
 
   const fetchDepartments = async () => {
-    const supabase = createClient()
-    const { data } = await supabase
-      .from('departments')
-      .select('*')
-      .order('name')
+    const { data } = await loadDepartments()
     setDepartments(data || [])
   }
+
+  useEffect(() => {
+    // 初回表示時に部門一覧を読み込む
+    let ignore = false
+    loadDepartments().then(({ data }) => {
+      if (!ignore) setDepartments(data || [])
+    })
+    return () => {
+      ignore = true
+    }
+  }, [])
 
   const handleAdd = async () => {
     if (!newDeptName.trim()) return

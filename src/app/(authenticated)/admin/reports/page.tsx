@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import { redirect } from 'next/navigation'
+import { requireRole } from '@/lib/auth'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { getDaysInMonth, minutesToHoursMinutes, toDateString } from '@/lib/utils'
 import { parseMonthParam } from '@/lib/security'
@@ -12,20 +12,8 @@ interface PageProps {
 
 export default async function ReportsPage({ searchParams }: PageProps) {
   const params = await searchParams
+  await requireRole('admin')
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-
-  if (!user) redirect('/login')
-
-  const { data: currentEmployee } = await supabase
-    .from('employees')
-    .select('role')
-    .eq('user_id', user.id)
-    .single()
-
-  if (currentEmployee?.role !== 'admin') {
-    redirect('/dashboard')
-  }
 
   // 対象月を決定（不正な値のときは日本時間の今月）
   const { year, month } = parseMonthParam(params.month)

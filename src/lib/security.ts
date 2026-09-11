@@ -1,6 +1,6 @@
 /**
  * セキュリティユーティリティ
- * 入力検証、サニタイズ、レート制限など
+ * 入力検証、URL パラメータ検証など
  */
 
 import { getTodayString } from './utils'
@@ -26,10 +26,11 @@ export const VALIDATION_RULES = {
     message: '有効なメールアドレスを入力してください',
   },
   password: {
-    pattern: /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/,
-    minLength: 8,
+    // 記号は Supabase Auth の password_requirements と同じ文字集合
+    pattern: /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=[\]{};'\\:"|<>?,./`~])\S+$/,
+    minLength: 12,
     maxLength: 128,
-    message: 'パスワードは8文字以上で、大文字・小文字・数字・記号を含めてください',
+    message: 'パスワードは12文字以上で、大文字・小文字・数字・記号を含めてください',
   },
   departmentName: {
     pattern: /^[\p{L}\p{N}\s\-・]{1,30}$/u,
@@ -106,36 +107,9 @@ export function validateFields(
 }
 
 // ========================================
-// XSSサニタイズ
-// ========================================
-
-const HTML_ENTITIES: Record<string, string> = {
-  '&': '&amp;',
-  '<': '&lt;',
-  '>': '&gt;',
-  '"': '&quot;',
-  "'": '&#39;',
-  '/': '&#x2F;',
-  '`': '&#x60;',
-  '=': '&#x3D;',
-}
-
-/**
- * HTML特殊文字をエスケープ
- */
-export function escapeHtml(str: string): string {
-  return str.replace(/[&<>"'`=/]/g, (char) => HTML_ENTITIES[char] || char)
-}
-
-/**
- * 入力をサニタイズ（トリム + XSS対策）
- */
-export function sanitize(input: string): string {
-  return escapeHtml(input.trim())
-}
-
-// ========================================
-// レート制限（クライアントサイド）
+// 連打防止（クライアントサイド）
+// ※ ブラウザ内だけの制御でセキュリティ対策ではない。
+//   ブルートフォース対策は Supabase Auth のレート制限・CAPTCHA で行う
 // ========================================
 
 interface RateLimitEntry {
@@ -205,44 +179,6 @@ export function resetRateLimit(key: string): void {
 }
 
 // ========================================
-// 安全なパスワード生成
-// ========================================
-
-const CHARSET = {
-  lowercase: 'abcdefghijklmnopqrstuvwxyz',
-  uppercase: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ',
-  numbers: '0123456789',
-  symbols: '@$!%*?&',
-}
-
-/**
- * 安全なランダムパスワードを生成
- */
-export function generateSecurePassword(length: number = 16): string {
-  const allChars = Object.values(CHARSET).join('')
-  const password: string[] = []
-
-  // 各文字種から最低1文字
-  password.push(CHARSET.lowercase[Math.floor(Math.random() * CHARSET.lowercase.length)])
-  password.push(CHARSET.uppercase[Math.floor(Math.random() * CHARSET.uppercase.length)])
-  password.push(CHARSET.numbers[Math.floor(Math.random() * CHARSET.numbers.length)])
-  password.push(CHARSET.symbols[Math.floor(Math.random() * CHARSET.symbols.length)])
-
-  // 残りをランダムに埋める
-  for (let i = password.length; i < length; i++) {
-    password.push(allChars[Math.floor(Math.random() * allChars.length)])
-  }
-
-  // シャッフル
-  for (let i = password.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1))
-    ;[password[i], password[j]] = [password[j], password[i]]
-  }
-
-  return password.join('')
-}
-
-// ========================================
 // URL パラメータ検証
 // ========================================
 
@@ -278,28 +214,4 @@ export function parseMonthParam(month: string | undefined): {
   }
 
   return { year, month: mon, isValid: true }
-}
-
-// ========================================
-// CSRFトークン（簡易実装）
-// ========================================
-
-let csrfToken: string | null = null
-
-/**
- * CSRFトークンを取得（クライアントサイド用）
- */
-export function getCsrfToken(): string {
-  if (!csrfToken) {
-    csrfToken = crypto.randomUUID()
-  }
-  return csrfToken
-}
-
-/**
- * CSRFトークンを再生成
- */
-export function regenerateCsrfToken(): string {
-  csrfToken = crypto.randomUUID()
-  return csrfToken
 }

@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { requireEmployee } from '@/lib/auth'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import {
   formatTime,
@@ -17,18 +18,8 @@ interface PageProps {
 
 export default async function AttendanceHistoryPage({ searchParams }: PageProps) {
   const params = await searchParams
+  const employee = await requireEmployee()
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-
-  if (!user) return null
-
-  const { data: employee } = await supabase
-    .from('employees')
-    .select('*')
-    .eq('user_id', user.id)
-    .single()
-
-  if (!employee) return null
 
   // 対象月を決定（不正な値のときは日本時間の今月）
   const { year, month } = parseMonthParam(params.month)
