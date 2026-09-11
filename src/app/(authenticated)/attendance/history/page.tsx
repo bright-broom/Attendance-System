@@ -1,6 +1,13 @@
 import { createClient } from '@/lib/supabase/server'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
-import { formatDate, minutesToHoursMinutes } from '@/lib/utils'
+import {
+  formatTime,
+  getDayOfWeek,
+  getDaysInMonth,
+  minutesToHoursMinutes,
+  toDateString,
+} from '@/lib/utils'
+import { parseMonthParam } from '@/lib/security'
 import { MonthSelector } from './month-selector'
 import styles from './page.module.css'
 
@@ -23,13 +30,13 @@ export default async function AttendanceHistoryPage({ searchParams }: PageProps)
 
   if (!employee) return null
 
-  // 対象月を決定
-  const now = new Date()
-  const targetMonth = params.month || `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
-  const [year, month] = targetMonth.split('-').map(Number)
+  // 対象月を決定（不正な値のときは日本時間の今月）
+  const { year, month } = parseMonthParam(params.month)
+  const targetMonth = `${year}-${String(month).padStart(2, '0')}`
 
-  const firstDay = new Date(year, month - 1, 1).toISOString().split('T')[0]
-  const lastDay = new Date(year, month, 0).toISOString().split('T')[0]
+  const daysInMonth = getDaysInMonth(year, month)
+  const firstDay = toDateString(year, month, 1)
+  const lastDay = toDateString(year, month, daysInMonth)
 
   // 勤怠データを取得
   const { data: attendances } = await supabase
@@ -62,11 +69,9 @@ export default async function AttendanceHistoryPage({ searchParams }: PageProps)
   )
 
   // カレンダー用の日付配列を生成
-  const daysInMonth = new Date(year, month, 0).getDate()
   const days = Array.from({ length: daysInMonth }, (_, i) => {
-    const date = new Date(year, month - 1, i + 1)
-    const dateStr = date.toISOString().split('T')[0]
-    const dayOfWeek = date.getDay()
+    const dateStr = toDateString(year, month, i + 1)
+    const dayOfWeek = getDayOfWeek(dateStr)
     return {
       date: dateStr,
       dayOfMonth: i + 1,
@@ -164,12 +169,12 @@ export default async function AttendanceHistoryPage({ searchParams }: PageProps)
                   </td>
                   <td>
                     {day.attendance?.clock_in
-                      ? formatDate(day.attendance.clock_in, 'HH:mm')
+                      ? formatTime(day.attendance.clock_in)
                       : '-'}
                   </td>
                   <td>
                     {day.attendance?.clock_out
-                      ? formatDate(day.attendance.clock_out, 'HH:mm')
+                      ? formatTime(day.attendance.clock_out)
                       : '-'}
                   </td>
                   <td>

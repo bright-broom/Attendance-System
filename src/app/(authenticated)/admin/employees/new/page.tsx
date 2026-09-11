@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { createEmployee } from './actions'
 import styles from './page.module.css'
 
 export default function NewEmployeePage() {
@@ -45,35 +46,16 @@ export default function NewEmployeePage() {
     setIsLoading(true)
     setError('')
 
-    const supabase = createClient()
-
-    // Supabase Authでユーザー作成
-    const { data: authData, error: authError } = await supabase.auth.signUp({
-      email: formData.email,
-      password: formData.password,
-    })
-
-    if (authError || !authData.user) {
-      setError(authError?.message || 'ユーザーの作成に失敗しました')
-      setIsLoading(false)
-      return
-    }
-
-    // 社員情報を登録
-    const { error: empError } = await supabase.from('employees').insert({
-      user_id: authData.user.id,
-      employee_number: formData.employee_number,
-      name: formData.name,
-      email: formData.email,
-      department_id: formData.department_id || null,
-      role: formData.role as 'admin' | 'manager' | 'employee',
-      employment_type: formData.employment_type as 'full_time' | 'part_time' | 'contract',
-      manager_id: formData.manager_id || null,
-      hire_date: formData.hire_date,
-    })
-
-    if (empError) {
-      setError('社員情報の登録に失敗しました')
+    // 認証ユーザーの作成と社員登録はサーバー側で行う
+    try {
+      const { error: createError } = await createEmployee(formData)
+      if (createError) {
+        setError(createError)
+        setIsLoading(false)
+        return
+      }
+    } catch {
+      setError('社員登録中にエラーが発生しました')
       setIsLoading(false)
       return
     }

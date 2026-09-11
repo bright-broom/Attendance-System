@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { addDaysToDateString, getTodayString } from '@/lib/utils'
 import { AttendanceClient } from './attendance-client'
 
 export default async function AttendancePage() {
@@ -19,13 +20,15 @@ export default async function AttendancePage() {
   }
 
   // 社員IDがわかったら今日の打刻記録を取得
-  const today = new Date().toISOString().split('T')[0]
+  // 今日（日本時間 0:00〜翌 0:00）の打刻記録を取得
+  const today = getTodayString()
+  const tomorrow = addDaysToDateString(today, 1)
   const { data: records } = await supabase
     .from('attendance_records')
     .select('id, attendance_type, recorded_at')
     .eq('employee_id', employee.id)
-    .gte('recorded_at', `${today}T00:00:00`)
-    .lt('recorded_at', `${today}T23:59:59`)
+    .gte('recorded_at', `${today}T00:00:00+09:00`)
+    .lt('recorded_at', `${tomorrow}T00:00:00+09:00`)
     .order('recorded_at', { ascending: true })
 
   return (

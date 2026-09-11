@@ -1,7 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
-import { minutesToHoursMinutes } from '@/lib/utils'
+import { getDaysInMonth, minutesToHoursMinutes, toDateString } from '@/lib/utils'
+import { parseMonthParam } from '@/lib/security'
 import { MonthSelector } from '@/app/(authenticated)/attendance/history/month-selector'
 import styles from './page.module.css'
 
@@ -26,13 +27,12 @@ export default async function ReportsPage({ searchParams }: PageProps) {
     redirect('/dashboard')
   }
 
-  // 対象月を決定
-  const now = new Date()
-  const targetMonth = params.month || `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
-  const [year, month] = targetMonth.split('-').map(Number)
+  // 対象月を決定（不正な値のときは日本時間の今月）
+  const { year, month } = parseMonthParam(params.month)
+  const targetMonth = `${year}-${String(month).padStart(2, '0')}`
 
-  const firstDay = new Date(year, month - 1, 1).toISOString().split('T')[0]
-  const lastDay = new Date(year, month, 0).toISOString().split('T')[0]
+  const firstDay = toDateString(year, month, 1)
+  const lastDay = toDateString(year, month, getDaysInMonth(year, month))
 
   // 全クエリを並列実行
   const [
@@ -67,7 +67,9 @@ export default async function ReportsPage({ searchParams }: PageProps) {
         departments(name),
         daily_attendances(overtime_minutes)
       `)
-      .eq('is_active', true),
+      .eq('is_active', true)
+      .gte('daily_attendances.work_date', firstDay)
+      .lte('daily_attendances.work_date', lastDay),
     // 全体勤怠サマリ
     supabase
       .from('daily_attendances')
@@ -145,7 +147,7 @@ export default async function ReportsPage({ searchParams }: PageProps) {
     <div className={styles.container}>
       <div className={styles.header}>
         <h1 className={styles.title}>レポート</h1>
-        <MonthSelector currentMonth={targetMonth} />
+        <MonthSelector currentMonth={targetMonth} basePath="/admin/reports" />
       </div>
 
       {/* 全体サマリ */}

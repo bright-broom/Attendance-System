@@ -101,15 +101,15 @@ export function AttendanceClient({
   const [loadingType, setLoadingType] = useState<string | null>(null)
 
   // レコードからステータスを計算（メモ化）
-  const { clockIn, clockOut, breakStart, breakEnd } = useMemo(() => {
-    const getLastRecord = (type: string) =>
-      records.filter((r) => r.attendance_type === type).slice(-1)[0]
+  const { clockIn, clockOut, isOnBreak } = useMemo(() => {
+    const getLastRecord = (types: string[]) =>
+      records.filter((r) => types.includes(r.attendance_type)).slice(-1)[0]
 
     return {
-      clockIn: getLastRecord('clock_in'),
-      clockOut: getLastRecord('clock_out'),
-      breakStart: getLastRecord('break_start'),
-      breakEnd: getLastRecord('break_end'),
+      clockIn: getLastRecord(['clock_in']),
+      clockOut: getLastRecord(['clock_out']),
+      // 最後の休憩系の打刻が「休憩開始」なら休憩中（複数回の休憩に対応）
+      isOnBreak: getLastRecord(['break_start', 'break_end'])?.attendance_type === 'break_start',
     }
   }, [records])
 
@@ -117,9 +117,9 @@ export function AttendanceClient({
   const buttonStates = useMemo(() => ({
     canClockIn: initialEmployee && !clockIn,
     canClockOut: initialEmployee && clockIn && !clockOut,
-    canBreakStart: initialEmployee && clockIn && !clockOut && (!breakStart || breakEnd),
-    canBreakEnd: initialEmployee && breakStart && !breakEnd,
-  }), [initialEmployee, clockIn, clockOut, breakStart, breakEnd])
+    canBreakStart: initialEmployee && clockIn && !clockOut && !isOnBreak,
+    canBreakEnd: initialEmployee && clockIn && !clockOut && isOnBreak,
+  }), [initialEmployee, clockIn, clockOut, isOnBreak])
 
   // 楽観的UI更新付き打刻処理
   const handlePunch = useCallback(async (type: string) => {
@@ -140,10 +140,10 @@ export function AttendanceClient({
       const supabase = getSupabase()
       const { data, error } = await supabase
         .from('attendance_records')
+        // 打刻時刻はサーバー（DB）側で記録する
         .insert({
           employee_id: initialEmployee.id,
           attendance_type: type,
-          recorded_at: optimisticRecord.recorded_at,
         })
         .select('id, attendance_type, recorded_at')
         .single()
@@ -262,7 +262,7 @@ export function AttendanceClient({
           <StatusDisplay
             clockIn={clockIn}
             clockOut={clockOut}
-            isOnBreak={!!(breakStart && !breakEnd)}
+            isOnBreak={isOnBreak}
           />
         </CardContent>
       </Card>
