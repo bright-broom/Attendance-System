@@ -2,33 +2,35 @@
 
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
+import { getTodayString } from '@/lib/utils'
 import styles from './month-selector.module.css'
 
 interface MonthSelectorProps {
   currentMonth: string
+  /** 月を切り替えたときの遷移先 */
+  basePath?: string
 }
 
-export function MonthSelector({ currentMonth }: MonthSelectorProps) {
+export function MonthSelector({ currentMonth, basePath = '/attendance/history' }: MonthSelectorProps) {
   const router = useRouter()
   const [year, month] = currentMonth.split('-').map(Number)
 
+  const goToMonth = (targetYear: number, targetMonth: number) => {
+    router.push(`${basePath}?month=${targetYear}-${String(targetMonth).padStart(2, '0')}`)
+  }
+
   const goToPrevMonth = () => {
-    const prevMonth = month === 1 ? 12 : month - 1
-    const prevYear = month === 1 ? year - 1 : year
-    router.push(`/attendance/history?month=${prevYear}-${String(prevMonth).padStart(2, '0')}`)
+    goToMonth(month === 1 ? year - 1 : year, month === 1 ? 12 : month - 1)
   }
 
   const goToNextMonth = () => {
-    const nextMonth = month === 12 ? 1 : month + 1
-    const nextYear = month === 12 ? year + 1 : year
-    router.push(`/attendance/history?month=${nextYear}-${String(nextMonth).padStart(2, '0')}`)
+    goToMonth(month === 12 ? year + 1 : year, month === 12 ? 1 : month + 1)
   }
 
   const goToCurrentMonth = () => {
-    const now = new Date()
-    router.push(
-      `/attendance/history?month=${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
-    )
+    // 日本時間の今月
+    const [currentYear, currentMonthNumber] = getTodayString().split('-').map(Number)
+    goToMonth(currentYear, currentMonthNumber)
   }
 
   return (

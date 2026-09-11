@@ -1,6 +1,13 @@
 import { createClient } from '@/lib/supabase/server'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
-import { formatDate, minutesToHoursMinutes } from '@/lib/utils'
+import {
+  formatDate,
+  formatTime,
+  getDaysInMonth,
+  getTodayString,
+  minutesToHoursMinutes,
+  toDateString,
+} from '@/lib/utils'
 import Link from 'next/link'
 import styles from './page.module.css'
 
@@ -29,16 +36,13 @@ export default async function DashboardPage() {
     )
   }
 
-  // 日付計算
+  // 日付計算（日本時間）
   const today = new Date()
-  const todayStr = today.toISOString().split('T')[0]
-  const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1)
-    .toISOString()
-    .split('T')[0]
-  const lastDayOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0)
-    .toISOString()
-    .split('T')[0]
-  const fiscalYear = today.getMonth() >= 3 ? today.getFullYear() : today.getFullYear() - 1
+  const todayStr = getTodayString(today)
+  const [year, month] = todayStr.split('-').map(Number)
+  const firstDayOfMonth = toDateString(year, month, 1)
+  const lastDayOfMonth = toDateString(year, month, getDaysInMonth(year, month))
+  const fiscalYear = month >= 4 ? year : year - 1
 
   // 全クエリを並列実行
   const [
@@ -100,7 +104,7 @@ export default async function DashboardPage() {
                     <span className={styles.timeLabel}>出勤</span>
                     <span className={styles.timeValue}>
                       {todayAttendance.clock_in
-                        ? formatDate(todayAttendance.clock_in, 'HH:mm')
+                        ? formatTime(todayAttendance.clock_in)
                         : '--:--'}
                     </span>
                   </div>
@@ -108,7 +112,7 @@ export default async function DashboardPage() {
                     <span className={styles.timeLabel}>退勤</span>
                     <span className={styles.timeValue}>
                       {todayAttendance.clock_out
-                        ? formatDate(todayAttendance.clock_out, 'HH:mm')
+                        ? formatTime(todayAttendance.clock_out)
                         : '--:--'}
                     </span>
                   </div>

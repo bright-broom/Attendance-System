@@ -1,5 +1,13 @@
 import type { NextConfig } from "next";
 
+// Supabase の接続先（ローカルの supabase start など *.supabase.co 以外にも対応）
+const supabaseOrigins = (() => {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  if (!url) return [];
+  const { origin } = new URL(url);
+  return [origin, origin.replace(/^http/, 'ws')];
+})();
+
 const securityHeaders = [
   // XSS攻撃対策
   {
@@ -40,7 +48,7 @@ const securityHeaders = [
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob:",
       "font-src 'self' data:",
-      "connect-src 'self' https://*.supabase.co wss://*.supabase.co",
+      ["connect-src 'self' https://*.supabase.co wss://*.supabase.co", ...supabaseOrigins].join(' '),
       "frame-ancestors 'none'",
       "form-action 'self'",
       "base-uri 'self'",

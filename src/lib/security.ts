@@ -3,6 +3,8 @@
  * 入力検証、サニタイズ、レート制限など
  */
 
+import { getTodayString } from './utils'
+
 // ========================================
 // 入力バリデーション
 // ========================================
@@ -252,9 +254,8 @@ export function parseMonthParam(month: string | undefined): {
   month: number
   isValid: boolean
 } {
-  const now = new Date()
-  const defaultYear = now.getFullYear()
-  const defaultMonth = now.getMonth() + 1
+  // 日本時間の今月
+  const [defaultYear, defaultMonth] = getTodayString().split('-').map(Number)
 
   if (!month) {
     return { year: defaultYear, month: defaultMonth, isValid: true }

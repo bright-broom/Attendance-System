@@ -23,7 +23,7 @@ npm install
 
 # 環境変数の設定
 cp .env.local.example .env.local
-# .env.local に Supabase の URL と ANON KEY を設定
+# .env.local に Supabase の URL、ANON KEY、SERVICE ROLE KEY を設定
 
 # 開発サーバーの起動
 npm run dev
@@ -34,7 +34,12 @@ npm run dev
 ```
 NEXT_PUBLIC_SUPABASE_URL=your-supabase-url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
+# 社員登録（認証ユーザー作成）に使用。サーバー側でのみ参照され、ブラウザには公開されない
+SUPABASE_SERVICE_ROLE_KEY=your-supabase-service-role-key
 ```
+
+社員はログイン画面から自己登録できず、管理者が「社員登録」画面から作成します。
+Supabase の Authentication 設定で新規サインアップ（Allow new users to sign up）を無効にしてください。
 
 ## ディレクトリ構成
 
